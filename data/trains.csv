@@ -1,11 +1,5 @@
-train_id,train_name,source_id,destination_id,total_seats
-TR001,Deccan Express,ST001,ST002,200
-TR002,Rajdhani Express,ST003,ST001,180
-TR003,Shatabdi Express,ST002,ST003,220
-TR004,Duronto Express,ST005,ST006,190
-TR005,Gujarat Mail,ST007,ST001,210
-TR006,Chennai Superfast,ST005,ST008,240
-TR007,Kashi Express,ST009,ST003,150
-TR008,Hyderabad Intercity,ST010,ST005,160
-TR009,Jaipur Mail,ST004,ST003,170
-TR010,Bangalore Rajdhani,ST008,ST003,200
+train_no,train_name,from_station,to_station,total_seats
+12001,Shatabdi Express,New Delhi,Bhopal,494
+12951,Mumbai Rajdhani,Mumbai Central,New Delhi,696
+12302,Howrah Rajdhani,Howrah,New Delhi,800
+12627,Karnataka Express,Bangalore,New Delhi,600
