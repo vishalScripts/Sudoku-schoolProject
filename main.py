@@ -242,44 +242,68 @@ class RailApp(tk.Tk):
     def build_dashboard(self):
         f = ttk.Frame(self.tab_dashboard, padding=12)
         f.pack(fill="both", expand=True)
+
+        # ---- Title ----
         header = ttk.Label(f, text="Welcome to RailTicket", style="Header.TLabel")
         header.pack(anchor="w")
 
-        subtitle = ttk.Label(f, text="Light modern UI • CSV-backed • Tabs for workflow", foreground="#666")
-        subtitle.pack(anchor="w", pady=(2,12))
+        subtitle = ttk.Label(
+            f,
+            text="Light modern UI • CSV-backed • Tabs for workflow",
+            foreground="#666"
+        )
+        subtitle.pack(anchor="w", pady=(2, 12))
 
-        top_frame = ttk.Frame(f)
-        top_frame.pack(fill="x", pady=6)
+        # ---- Hero / Dashboard Image ----
+        hero_frame = tk.Frame(f, bg="#dfe6e9", height=300)  # adjustable height
+        hero_frame.pack(fill="x", pady=(0, 20))
+        hero_frame.pack_propagate(False)
 
-        # quick stats cards
-        cards = ttk.Frame(top_frame)
-        cards.pack(side="left", fill="x", expand=True)
+        # image inside the hero
+        canvas = tk.Canvas(hero_frame, width=900, height=300, highlightthickness=0)
+        canvas.pack(fill="x")
+        self.dashboard_img = tk.PhotoImage(file="dashboard.png").subsample(4,4)
+        canvas.create_image(600, 130, image=self.dashboard_img)
 
-        self.card_total_trains = self.make_stat_card(cards, "Trains", "—")
-        self.card_total_stations = self.make_stat_card(cards, "Stations", "—")
-        self.card_next_schedule = self.make_stat_card(cards, "Next Schedule", "—")
 
-        right = ttk.Frame(top_frame)
-        right.pack(side="right", fill="y")
-        ttk.Button(right, text="Refresh Data", command=self.refresh_all_data).pack(padx=6, pady=6)
 
-        # small help/instructions
+        # ---- Stat cards overlay ----
+        cards_frame = tk.Frame(hero_frame, bg="", height=120)
+        cards_frame.place(x=300, rely=1.0, anchor="s", y=-10)  # floats near bottom
+
+        # individual cards
+        self.card_total_trains = self.make_stat_card(cards_frame, "Trains", "—")
+        self.card_total_stations = self.make_stat_card(cards_frame, "Stations", "—")
+        self.card_next_schedule = self.make_stat_card(cards_frame, "Next Schedule", "—")
+
+        # ---- Right side button below image ----
+        action_frame = tk.Frame(hero_frame, bg="", height=120)
+        action_frame.place(relx=0.9, rely=1.0, anchor="s", y=-10, x=35)
+        ttk.Button(action_frame, text="Refresh Data", command=self.refresh_all_data, style="Accent.TButton").pack(anchor="e")
+
+        # ---- Help / Tips Section ----
         help_box = ttk.LabelFrame(f, text="Quick tips", padding=10, style="Card.TFrame")
         help_box.pack(fill="both", expand=True, pady=12)
-        txt = ("• Use the 'Book Ticket' tab to search trains by station or schedule.\n"
-               "• 'Schedules' lists upcoming runs and lets you pick a date.\n"
-               "• Bookings are saved to data/bookings.csv — you can view/delete them in 'My Bookings'.\n"
-               "• Stats show bookings grouped by train or date.")
+        txt = (
+            "• Use the 'Book Ticket' tab to search trains by station or schedule.\n"
+            "• 'Schedules' lists upcoming runs and lets you pick a date.\n"
+            "• Bookings are saved to data/bookings.csv — you can view/delete them in 'My Bookings'.\n"
+            "• Stats show bookings grouped by train or date."
+        )
         lbl = ttk.Label(help_box, text=txt, wraplength=880, foreground="#333")
         lbl.pack(anchor="w")
 
+
     def make_stat_card(self, parent, title, value):
-        card = ttk.Frame(parent, style="Card.TFrame", padding=10)
-        card.pack(side="left", padx=8, ipadx=6, ipady=6)
-        ttk.Label(card, text=title, font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        # ---- Simulated rounded cards using padding and background ----
+        card = tk.Frame(parent, bg="#ffffff", highlightbackground="#ccc", highlightthickness=1)
+        card.pack(side="left", padx=0, ipadx=0, ipady=0)
+
+        ttk.Label(card, text=title, font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=10)
         v = ttk.Label(card, text=value, font=("Segoe UI", 20, "bold"))
-        v.pack(anchor="w", pady=(6,0))
+        v.pack(anchor="w", pady=(0, 0), padx=10)
         return v
+
 
     def refresh_all_data(self):
         self.load_station_train_data()
