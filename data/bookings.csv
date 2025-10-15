@@ -1,0 +1,13 @@
+booking_id,passenger_name,train_id,travel_date,seat_no,status
+BK001,Vishal Kumar,TR001,2025-10-16,12,Confirmed
+BK002,Rahul Mehta,TR002,2025-10-17,34,Confirmed
+BK003,Ananya Singh,TR003,2025-10-16,89,Pending
+BK004,Rajesh Patel,TR005,2025-10-18,45,Confirmed
+BK005,Simran Joshi,TR004,2025-10-17,23,Cancelled
+BK006,Neha Sharma,TR006,2025-10-16,110,Confirmed
+BK007,Aditya Rao,TR010,2025-10-17,75,Pending
+BK008,Ritika Nair,TR007,2025-10-17,61,Confirmed
+BK009,Deepak Yadav,TR008,2025-10-16,52,Confirmed
+BK010,Arjun Verma,TR009,2025-10-18,99,Cancelled
+BK2025101518040343,vishal,TR001,2025-10-16,1,Confirmed
+BK2025101518041062,vishal,TR001,2025-10-16,2,Confirmed

@@ -1,2 +1,0 @@
-booking_id,timestamp,train_no,train_name,from,to,date,class,seats,passenger_name,phone,price_per_seat,total_price
-BK20251015174040,2025-10-15T17:40:40.284777,12001,Kolkata Express,Kolkata,Delhi,2025-10-15,Sleeper,1,vishal,5555555555,204,204

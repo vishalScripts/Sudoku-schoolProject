@@ -1,407 +1,641 @@
 #!/usr/bin/env python3
 """
-rail_ticket_app.py
-A simple Tkinter ticket booking app using pandas, matplotlib and csv.
+rail_ticket_app_csv.py
+Upgraded Tkinter Rail Ticket Booking app backed by CSVs:
+ - data/stations.csv
+ - data/trains.csv
+ - data/schedules.csv
+ - data/bookings.csv
 
 Features:
-- Search trains (sample static dataset included)
-- Book tickets and save to bookings.csv
-- View bookings (pandas DataFrame)
-- View simple booking statistics chart (matplotlib embedded)
-
+ - Auto-creates sample CSVs if missing
+ - Tabs: Dashboard, Book Ticket, Schedules, My Bookings, Stats
+ - Modern light UI (ttk) with spacing and clean fonts
+ - Use pandas for CSV reads, csv for appends
+ - Seat allocation (lowest available seat numbers)
+ - Embedded matplotlib chart
 Author: generated for Vishal
 """
+import os
+import csv
 import tkinter as tk
 from tkinter import ttk, messagebox
-import pandas as pd
-import csv
-import os
+from tkinter.scrolledtext import ScrolledText
 from datetime import datetime
+import random
+import pandas as pd
 import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-# ---------------------------
-# Sample train dataset
-# ---------------------------
-SAMPLE_TRAINS = [
-    {"train_no": "12001", "name": "Kolkata Express", "from": "Kolkata", "to": "Delhi", "duration": "22:30"},
-    {"train_no": "12951", "name": "Mumbai Rajdhani", "from": "Mumbai", "to": "Delhi", "duration": "17:45"},
-    {"train_no": "12863", "name": "Shatabdi AC", "from": "Delhi", "to": "Agra", "duration": "03:20"},
-    {"train_no": "11018", "name": "Intercity Fast", "from": "Pune", "to": "Mumbai", "duration": "04:00"},
-    {"train_no": "22691", "name": "Duronto Special", "from": "Chennai", "to": "Bengaluru", "duration": "06:30"},
-    {"train_no": "15667", "name": "Coastal Queen", "from": "Vijayawada", "to": "Visakhapatnam", "duration": "05:00"},
-    {"train_no": "19311", "name": "Humsafar", "from": "Patna", "to": "Howrah", "duration": "12:00"}
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+STATIONS_CSV = os.path.join(DATA_DIR, "stations.csv")
+TRAINS_CSV = os.path.join(DATA_DIR, "trains.csv")
+SCHEDULES_CSV = os.path.join(DATA_DIR, "schedules.csv")
+BOOKINGS_CSV = os.path.join(DATA_DIR, "bookings.csv")
+
+# -----------------------
+# Sample CSV contents
+# -----------------------
+SAMPLE_STATIONS = [
+    ("ST001","Mumbai Central","Mumbai"),
+    ("ST002","Pune Junction","Pune"),
+    ("ST003","Delhi Junction","Delhi"),
+    ("ST004","Jaipur Junction","Jaipur"),
+    ("ST005","Chennai Central","Chennai"),
+    ("ST006","Kolkata Howrah","Kolkata"),
+    ("ST007","Ahmedabad Junction","Ahmedabad"),
+    ("ST008","Bangalore City","Bangalore"),
+    ("ST009","Varanasi Junction","Varanasi"),
+    ("ST010","Hyderabad Deccan","Hyderabad"),
 ]
 
-BOOKINGS_FILE = "bookings.csv"
-BOOKING_FIELDS = ["booking_id", "timestamp", "train_no", "train_name", "from", "to", "date", "class", "seats", "passenger_name", "phone", "price_per_seat", "total_price"]
+SAMPLE_TRAINS = [
+    ("TR001","Deccan Express","ST001","ST002","200"),
+    ("TR002","Rajdhani Express","ST003","ST001","180"),
+    ("TR003","Shatabdi Express","ST002","ST003","220"),
+    ("TR004","Duronto Express","ST005","ST006","190"),
+    ("TR005","Gujarat Mail","ST007","ST001","210"),
+    ("TR006","Chennai Superfast","ST005","ST008","240"),
+    ("TR007","Kashi Express","ST009","ST003","150"),
+    ("TR008","Hyderabad Intercity","ST010","ST005","160"),
+    ("TR009","Jaipur Mail","ST004","ST003","170"),
+    ("TR010","Bangalore Rajdhani","ST008","ST003","200"),
+]
 
-# ---------------------------
-# Utilities
-# ---------------------------
-def ensure_bookings_file():
-    """Ensure CSV exists with headers."""
-    if not os.path.exists(BOOKINGS_FILE):
-        with open(BOOKINGS_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=BOOKING_FIELDS)
-            writer.writeheader()
+SAMPLE_SCHEDULES = [
+    ("SC001","TR001","07:30 AM","11:45 AM","2025-10-16"),
+    ("SC002","TR002","08:00 PM","06:15 AM","2025-10-17"),
+    ("SC003","TR003","05:00 PM","11:00 PM","2025-10-16"),
+    ("SC004","TR004","09:00 AM","08:00 PM","2025-10-17"),
+    ("SC005","TR005","06:00 AM","01:30 PM","2025-10-18"),
+    ("SC006","TR006","03:30 PM","09:45 PM","2025-10-16"),
+    ("SC007","TR007","11:15 AM","08:30 PM","2025-10-17"),
+    ("SC008","TR008","07:00 AM","01:15 PM","2025-10-16"),
+    ("SC009","TR009","10:30 AM","06:30 PM","2025-10-18"),
+    ("SC010","TR010","08:45 PM","05:45 AM","2025-10-17"),
+]
+
+SAMPLE_BOOKINGS = [
+    ("BK001","Vishal Kumar","TR001","2025-10-16","12","Confirmed"),
+    ("BK002","Rahul Mehta","TR002","2025-10-17","34","Confirmed"),
+    ("BK003","Ananya Singh","TR003","2025-10-16","89","Pending"),
+    ("BK004","Rajesh Patel","TR005","2025-10-18","45","Confirmed"),
+    ("BK005","Simran Joshi","TR004","2025-10-17","23","Cancelled"),
+    ("BK006","Neha Sharma","TR006","2025-10-16","110","Confirmed"),
+    ("BK007","Aditya Rao","TR010","2025-10-17","75","Pending"),
+    ("BK008","Ritika Nair","TR007","2025-10-17","61","Confirmed"),
+    ("BK009","Deepak Yadav","TR008","2025-10-16","52","Confirmed"),
+    ("BK010","Arjun Verma","TR009","2025-10-18","99","Cancelled"),
+]
+
+# -----------------------
+# Utilities: ensure data dir and files exist
+# -----------------------
+def ensure_data_files():
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+    if not os.path.exists(STATIONS_CSV):
+        with open(STATIONS_CSV, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["station_id","station_name","city"])
+            writer.writerows(SAMPLE_STATIONS)
+
+    if not os.path.exists(TRAINS_CSV):
+        with open(TRAINS_CSV, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["train_id","train_name","source_id","destination_id","total_seats"])
+            writer.writerows(SAMPLE_TRAINS)
+
+    if not os.path.exists(SCHEDULES_CSV):
+        with open(SCHEDULES_CSV, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["schedule_id","train_id","departure_time","arrival_time","travel_date"])
+            writer.writerows(SAMPLE_SCHEDULES)
+
+    if not os.path.exists(BOOKINGS_CSV):
+        with open(BOOKINGS_CSV, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["booking_id","passenger_name","train_id","travel_date","seat_no","status"])
+            writer.writerows(SAMPLE_BOOKINGS)
+
+def read_stations_df():
+    return pd.read_csv(STATIONS_CSV, dtype=str)
+
+def read_trains_df():
+    return pd.read_csv(TRAINS_CSV, dtype=str)
+
+def read_schedules_df():
+    return pd.read_csv(SCHEDULES_CSV, dtype=str)
 
 def read_bookings_df():
-    ensure_bookings_file()
-    try:
-        df = pd.read_csv(BOOKINGS_FILE, parse_dates=["timestamp"])
-    except Exception:
-        df = pd.DataFrame(columns=BOOKING_FIELDS)
-    return df
+    return pd.read_csv(BOOKINGS_CSV, dtype=str)
 
-def append_booking(record: dict):
-    ensure_bookings_file()
-    with open(BOOKINGS_FILE, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=BOOKING_FIELDS)
-        writer.writerow(record)
+def append_booking_csv(record: dict):
+    # record: booking_id, passenger_name, train_id, travel_date, seat_no, status
+    with open(BOOKINGS_CSV, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([record["booking_id"], record["passenger_name"], record["train_id"],
+                         record["travel_date"], record["seat_no"], record["status"]])
 
-def generate_booking_id():
-    return "BK" + datetime.now().strftime("%Y%m%d%H%M%S")
+def gen_booking_id():
+    return "BK" + datetime.now().strftime("%Y%m%d%H%M%S") + str(random.randint(10,99))
 
-def price_for(train_no, travel_class):
-    # Simple price heuristic: base by train_no digits + class multiplier
-    base = (sum(int(d) for d in train_no if d.isdigit()) % 500) + 200
-    multiplier = {"Sleeper":1.0, "3AC":1.8, "2AC":2.5, "1AC":4.0, "CC":1.3}
-    return int(base * multiplier.get(travel_class, 1.0))
+# -----------------------
+# Seat allocation helper
+# -----------------------
+def available_seats_for(train_id, travel_date, total_seats):
+    """
+    Compute lowest available seat numbers for train_id on travel_date.
+    Returns a sorted list of available seat integers.
+    """
+    dfb = read_bookings_df()
+    # select confirmed and pending seats for that train/date
+    taken = set()
+    if not dfb.empty:
+        dfb = dfb.fillna("")
+        sel = dfb[(dfb["train_id"] == train_id) & (dfb["travel_date"] == travel_date)]
+        for val in sel["seat_no"].astype(str).tolist():
+            try:
+                taken.add(int(val))
+            except Exception:
+                pass
+    all_seats = set(range(1, int(total_seats)+1))
+    avail = sorted(list(all_seats - taken))
+    return avail
 
-# ---------------------------
-# Main Application
-# ---------------------------
-class RailTicketApp(tk.Tk):
+# -----------------------
+# UI: Main Application
+# -----------------------
+class RailApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("RailTicket — Simple Ticket Booking App 🚆")
-        self.geometry("980x640")
-        self.minsize(900, 600)
+        self.title("RailTicket — CSV Powered (Light Modern UI) 🚆")
+        self.geometry("1050x650")
+        self.minsize(980, 600)
 
         # style
-        style = ttk.Style(self)
-        style.theme_use("clam")
-        style.configure("TNotebook", tabposition='n')
-        style.configure("TButton", padding=6)
-        style.configure("Accent.TButton", foreground="white", background="#2a9d8f")
+        self.setup_style()
 
-        # Notebook tabs
+        # Notebook (tabs)
         self.nb = ttk.Notebook(self)
-        self.nb.pack(fill="both", expand=True, padx=10, pady=10)
+        self.nb.pack(fill="both", expand=True, padx=12, pady=12)
 
-        self.tab_search = ttk.Frame(self.nb)
+        # tabs
+        self.tab_dashboard = ttk.Frame(self.nb)
+        self.tab_book = ttk.Frame(self.nb)
+        self.tab_schedules = ttk.Frame(self.nb)
         self.tab_bookings = ttk.Frame(self.nb)
         self.tab_stats = ttk.Frame(self.nb)
 
-        self.nb.add(self.tab_search, text="Search & Book")
+        self.nb.add(self.tab_dashboard, text="Dashboard")
+        self.nb.add(self.tab_book, text="Book Ticket")
+        self.nb.add(self.tab_schedules, text="Schedules")
         self.nb.add(self.tab_bookings, text="My Bookings")
         self.nb.add(self.tab_stats, text="Stats")
 
-        # Build tabs
-        self._build_search_tab()
-        self._build_bookings_tab()
-        self._build_stats_tab()
+        # Build UIs
+        self.build_dashboard()
+        self.build_book_tab()
+        self.build_schedules_tab()
+        self.build_bookings_tab()
+        self.build_stats_tab()
 
-        # refresh bookings on start
+        # initial loads
+        self.load_station_train_data()
+        self.refresh_schedules_tree()
         self.refresh_bookings_table()
-        self.draw_stats_chart()
+        self.draw_stats()
+
+    def setup_style(self):
+        style = ttk.Style(self)
+        # use clam or default
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+        # colors for light modern look
+        primary = "#2b7a78"   # teal-ish
+        accent = "#83c5be"
+        bg = "#f7fbfb"
+        card = "#ffffff"
+
+        self.configure(bg=bg)
+        style.configure("TFrame", background=bg)
+        style.configure("Card.TFrame", background=card, relief="flat")
+        style.configure("TLabel", background=bg, font=("Segoe UI", 10))
+        style.configure("Header.TLabel", font=("Segoe UI", 14, "bold"), background=bg)
+        style.configure("TButton", padding=6, font=("Segoe UI", 10))
+        style.configure("Accent.TButton", background=primary, foreground="white")
+        style.map("Accent.TButton", background=[('active', accent)])
+
+        # Treeview style
+        style.configure("Treeview", font=("Segoe UI", 10), rowheight=26)
+        style.configure("Treeview.Heading", font=("Segoe UI", 10, "bold"))
+        style.map("Treeview", background=[('selected', primary)])
 
     # -----------------------
-    # Tab: Search & Book
+    # Dashboard Tab
     # -----------------------
-    def _build_search_tab(self):
-        frame = self.tab_search
-        left = ttk.Frame(frame)
-        left.pack(side="left", fill="y", padx=12, pady=12)
+    def build_dashboard(self):
+        f = ttk.Frame(self.tab_dashboard, padding=12)
+        f.pack(fill="both", expand=True)
+        header = ttk.Label(f, text="Welcome to RailTicket", style="Header.TLabel")
+        header.pack(anchor="w")
 
-        right = ttk.Frame(frame)
-        right.pack(side="right", fill="both", expand=True, padx=12, pady=12)
+        subtitle = ttk.Label(f, text="Light modern UI • CSV-backed • Tabs for workflow", foreground="#666")
+        subtitle.pack(anchor="w", pady=(2,12))
 
-        # Search controls
-        ttk.Label(left, text="From").pack(anchor="w", pady=(4,0))
-        self.ent_from = ttk.Entry(left, width=20)
-        self.ent_from.pack(pady=4)
+        top_frame = ttk.Frame(f)
+        top_frame.pack(fill="x", pady=6)
 
-        ttk.Label(left, text="To").pack(anchor="w", pady=(8,0))
-        self.ent_to = ttk.Entry(left, width=20)
-        self.ent_to.pack(pady=4)
+        # quick stats cards
+        cards = ttk.Frame(top_frame)
+        cards.pack(side="left", fill="x", expand=True)
 
-        ttk.Label(left, text="Date (YYYY-MM-DD)").pack(anchor="w", pady=(8,0))
-        self.ent_date = ttk.Entry(left, width=20)
-        self.ent_date.pack(pady=4)
-        self.ent_date.insert(0, datetime.now().strftime("%Y-%m-%d"))
+        self.card_total_trains = self.make_stat_card(cards, "Trains", "—")
+        self.card_total_stations = self.make_stat_card(cards, "Stations", "—")
+        self.card_next_schedule = self.make_stat_card(cards, "Next Schedule", "—")
 
-        ttk.Button(left, text="Search Trains", command=self.search_trains).pack(pady=(10,4), fill="x")
+        right = ttk.Frame(top_frame)
+        right.pack(side="right", fill="y")
+        ttk.Button(right, text="Refresh Data", command=self.refresh_all_data).pack(padx=6, pady=6)
 
-        # Search results listbox
-        ttk.Label(left, text="Available Trains").pack(anchor="w", pady=(10,0))
-        self.lst_trains = tk.Listbox(left, height=12, width=40, activestyle='none')
-        self.lst_trains.pack(pady=6)
-        self.lst_trains.bind("<<ListboxSelect>>", self.on_train_select)
+        # small help/instructions
+        help_box = ttk.LabelFrame(f, text="Quick tips", padding=10, style="Card.TFrame")
+        help_box.pack(fill="both", expand=True, pady=12)
+        txt = ("• Use the 'Book Ticket' tab to search trains by station or schedule.\n"
+               "• 'Schedules' lists upcoming runs and lets you pick a date.\n"
+               "• Bookings are saved to data/bookings.csv — you can view/delete them in 'My Bookings'.\n"
+               "• Stats show bookings grouped by train or date.")
+        lbl = ttk.Label(help_box, text=txt, wraplength=880, foreground="#333")
+        lbl.pack(anchor="w")
 
-        # Booking form fields on the right
-        ttk.Label(right, text="Selected Train", font=("Segoe UI", 10, "bold")).pack(anchor="w")
-        self.lbl_selected = ttk.Label(right, text="(No train selected)", foreground="#555")
-        self.lbl_selected.pack(anchor="w", pady=(0,10))
+    def make_stat_card(self, parent, title, value):
+        card = ttk.Frame(parent, style="Card.TFrame", padding=10)
+        card.pack(side="left", padx=8, ipadx=6, ipady=6)
+        ttk.Label(card, text=title, font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        v = ttk.Label(card, text=value, font=("Segoe UI", 20, "bold"))
+        v.pack(anchor="w", pady=(6,0))
+        return v
 
-        form = ttk.Frame(right)
-        form.pack(anchor="nw", fill="x", pady=6)
+    def refresh_all_data(self):
+        self.load_station_train_data()
+        self.refresh_schedules_tree()
+        self.refresh_bookings_table()
+        self.draw_stats()
+        messagebox.showinfo("Refreshed", "Data refreshed from CSV files.")
 
-        ttk.Label(form, text="Passenger Name").grid(row=0, column=0, sticky="w")
-        self.ent_name = ttk.Entry(form, width=34)
-        self.ent_name.grid(row=0, column=1, pady=6, padx=6)
+    # -----------------------
+    # Load station/train data
+    # -----------------------
+    def load_station_train_data(self):
+        self.stations = read_stations_df()
+        self.trains = read_trains_df()
+        self.schedules = read_schedules_df()
+        # update stat cards
+        self.card_total_trains.config(text=str(len(self.trains)))
+        self.card_total_stations.config(text=str(len(self.stations)))
+        # compute next schedule (earliest upcoming travel_date >= today)
+        try:
+            today = datetime.now().date()
+            df = self.schedules.copy()
+            df['dt'] = pd.to_datetime(df['travel_date'], errors='coerce').dt.date
+            upcoming = df[df['dt'] >= today].sort_values('dt')
+            if not upcoming.empty:
+                r = upcoming.iloc[0]
+                train_name = self.trains[self.trains['train_id'] == r['train_id']]['train_name'].values[0]
+                self.card_next_schedule.config(text=f"{train_name} on {r['travel_date']}")
+            else:
+                self.card_next_schedule.config(text="No upcoming schedules")
+        except Exception:
+            self.card_next_schedule.config(text="—")
+
+    # -----------------------
+    # Book Ticket Tab
+    # -----------------------
+    def build_book_tab(self):
+        f = ttk.Frame(self.tab_book, padding=12)
+        f.pack(fill="both", expand=True)
+
+        left = ttk.Frame(f)
+        left.pack(side="left", fill="y", padx=(0,12))
+
+        ttk.Label(left, text="Search by Station", font=("Segoe UI", 11, "bold")).pack(anchor="w")
+        ttk.Label(left, text="From station (partial)").pack(anchor="w", pady=(6,0))
+        self.ent_from = ttk.Entry(left, width=28)
+        self.ent_from.pack(pady=6)
+
+        ttk.Label(left, text="To station (partial)").pack(anchor="w")
+        self.ent_to = ttk.Entry(left, width=28)
+        self.ent_to.pack(pady=6)
+
+        ttk.Label(left, text="Travel date (YYYY-MM-DD)").pack(anchor="w")
+        self.ent_date = ttk.Entry(left, width=28)
+        self.ent_date.pack(pady=6)
+
+        ttk.Button(left, text="Search Trains", command=self.search_trains_for_booking, style="Accent.TButton").pack(pady=(10,6), fill="x")
+
+        ttk.Separator(f, orient="vertical").pack(side="left", fill="y", padx=12)
+
+        right = ttk.Frame(f)
+        right.pack(side="left", fill="both", expand=True)
+
+        ttk.Label(right, text="Search results", font=("Segoe UI", 11, "bold")).pack(anchor="w")
+        self.search_tree = ttk.Treeview(right, columns=("train_id","train_name","route","seats"), show="headings", height=8)
+        self.search_tree.heading("train_id", text="Train ID")
+        self.search_tree.heading("train_name", text="Train")
+        self.search_tree.heading("route", text="Route")
+        self.search_tree.heading("seats", text="Seats")
+        self.search_tree.pack(fill="x", pady=6)
+        self.search_tree.bind("<<TreeviewSelect>>", self.on_search_select)
+
+        # booking form
+        form = ttk.LabelFrame(right, text="Book selected train", padding=10, style="Card.TFrame")
+        form.pack(fill="both", expand=True, pady=8)
+        ttk.Label(form, text="Passenger name").grid(row=0, column=0, sticky="w")
+        self.book_name = ttk.Entry(form, width=36)
+        self.book_name.grid(row=0, column=1, pady=6, padx=6)
 
         ttk.Label(form, text="Phone").grid(row=1, column=0, sticky="w")
-        self.ent_phone = ttk.Entry(form, width=34)
-        self.ent_phone.grid(row=1, column=1, pady=6, padx=6)
+        self.book_phone = ttk.Entry(form, width=36)
+        self.book_phone.grid(row=1, column=1, pady=6, padx=6)
 
-        ttk.Label(form, text="Class").grid(row=2, column=0, sticky="w")
-        self.cmb_class = ttk.Combobox(form, values=["Sleeper", "3AC", "2AC", "1AC", "CC"], state="readonly", width=32)
-        self.cmb_class.current(0)
-        self.cmb_class.grid(row=2, column=1, pady=6, padx=6)
-
-        ttk.Label(form, text="Seats").grid(row=3, column=0, sticky="w")
-        self.spin_seats = ttk.Spinbox(form, from_=1, to=10, width=5)
+        ttk.Label(form, text="Seats to book").grid(row=2, column=0, sticky="w")
+        self.spin_seats = ttk.Spinbox(form, from_=1, to=6, width=6)
         self.spin_seats.set(1)
-        self.spin_seats.grid(row=3, column=1, sticky="w", pady=6, padx=6)
+        self.spin_seats.grid(row=2, column=1, sticky="w", pady=6, padx=6)
 
-        ttk.Button(right, text="Book Ticket", command=self.book_ticket, style="Accent.TButton").pack(pady=12, anchor="w")
+        ttk.Label(form, text="Selected schedule").grid(row=3, column=0, sticky="w")
+        self.sel_schedule_lbl = ttk.Label(form, text="(none)")
+        self.sel_schedule_lbl.grid(row=3, column=1, sticky="w", pady=6, padx=6)
 
-        # Price preview
-        self.lbl_price_preview = ttk.Label(right, text="Price: ₹0  (per seat: ₹0)", font=("Segoe UI", 10))
-        self.lbl_price_preview.pack(anchor="w", pady=6)
+        ttk.Button(form, text="Show available seats", command=self.show_available_seats).grid(row=4, column=0, pady=8)
+        ttk.Button(form, text="Book Now", command=self.book_now, style="Accent.TButton").grid(row=4, column=1, pady=8, sticky="w")
 
-        # Fill initial train list
-        self.display_trains(SAMPLE_TRAINS)
+        self.available_seats_box = ScrolledText(form, height=4, width=48)
+        self.available_seats_box.grid(row=5, column=0, columnspan=2, pady=(6,0))
 
-    def display_trains(self, trains):
-        self.lst_trains.delete(0, tk.END)
-        for t in trains:
-            label = f"{t['train_no']} — {t['name']}  [{t['from']} → {t['to']}]  ({t['duration']})"
-            self.lst_trains.insert(tk.END, label)
-        # store displayed trains reference
-        self.current_displayed_trains = trains
+        # internal selection
+        self.selected_schedule = None
 
-    def search_trains(self):
-        src = self.ent_from.get().strip()
-        dst = self.ent_to.get().strip()
-        date_text = self.ent_date.get().strip()
-        # validate date format quickly
+    def search_trains_for_booking(self):
+        src = self.ent_from.get().strip().lower()
+        dst = self.ent_to.get().strip().lower()
+        date = self.ent_date.get().strip()
+        # validate date loosely
         try:
-            datetime.strptime(date_text, "%Y-%m-%d")
+            datetime.strptime(date, "%Y-%m-%d")
         except Exception:
-            messagebox.showerror("Invalid date", "Please enter date in YYYY-MM-DD format.")
+            messagebox.showerror("Invalid date", "Please use YYYY-MM-DD format.")
             return
+        # find station ids matching input
+        st_df = self.stations.fillna("")
+        matched_from = st_df[st_df['station_name'].str.lower().str.contains(src)] if src else st_df
+        matched_to = st_df[st_df['station_name'].str.lower().str.contains(dst)] if dst else st_df
 
-        # simple search: filter sample trains by substring matching (case-insensitive)
+        # find trains where source in matched_from and dest in matched_to
+        tr_df = self.trains.fillna("")
         results = []
-        for t in SAMPLE_TRAINS:
-            ok_from = src.lower() in t["from"].lower() if src else True
-            ok_to = dst.lower() in t["to"].lower() if dst else True
-            if ok_from and ok_to:
-                results.append(t)
-        if not results:
-            messagebox.showinfo("No trains", "No trains found for given route. Try leaving one field empty for broader search.")
-        self.display_trains(results)
+        for _, tr in tr_df.iterrows():
+            if (tr['source_id'] in matched_from['station_id'].values) and (tr['destination_id'] in matched_to['station_id'].values):
+                results.append(tr)
 
-    def on_train_select(self, event):
-        sel = self.lst_trains.curselection()
+        # Also consider schedules on that date for trains
+        sched_df = self.schedules.fillna("")
+        sched_on_date = sched_df[sched_df['travel_date'] == date]
+        # Filter results to ones that have schedule on that date
+        sched_trains = set(sched_on_date['train_id'].values.tolist())
+        filtered = [r for r in results if r['train_id'] in sched_trains]
+
+        # show in tree
+        for r in self.search_tree.get_children():
+            self.search_tree.delete(r)
+        if not filtered:
+            messagebox.showinfo("No trains", "No trains found for that route and date.")
+            return
+        for tr in filtered:
+            src_name = self.stations[self.stations['station_id'] == tr['source_id']]['station_name'].values[0]
+            dst_name = self.stations[self.stations['station_id'] == tr['destination_id']]['station_name'].values[0]
+            # seats field is total seats
+            self.search_tree.insert("", tk.END, iid=tr['train_id'], values=(tr['train_id'], tr['train_name'], f"{src_name}→{dst_name}", tr['total_seats']))
+
+    def on_search_select(self, event):
+        sel = self.search_tree.selection()
         if not sel:
             return
-        idx = sel[0]
-        train = self.current_displayed_trains[idx]
-        self.selected_train = train
-        self.lbl_selected.config(text=f"{train['train_no']} — {train['name']}  ({train['from']} → {train['to']})")
-        # update price preview
-        class_choice = self.cmb_class.get()
-        seats = int(self.spin_seats.get())
-        pps = price_for(train["train_no"], class_choice)
-        total = pps * seats
-        self.lbl_price_preview.config(text=f"Price: ₹{total}  (per seat: ₹{pps})")
+        tid = sel[0]
+        # find schedule options for this train & selected date
+        date = self.ent_date.get().strip()
+        sf = self.schedules[(self.schedules['train_id'] == tid) & (self.schedules['travel_date'] == date)]
+        if sf.empty:
+            self.selected_schedule = None
+            self.sel_schedule_lbl.config(text="No schedule on this date")
+            self.available_seats_box.delete("1.0", tk.END)
+        else:
+            # if multiple schedules, pick first (or allow choose later)
+            row = sf.iloc[0]
+            sched_text = f"{row['schedule_id']} — {row['departure_time']} → {row['arrival_time']} on {row['travel_date']}"
+            self.sel_schedule_lbl.config(text=sched_text)
+            self.selected_schedule = row.to_dict()
+            # update available seats box
+            self.show_available_seats()
 
-    # -----------------------
-    # Booking handling
-    # -----------------------
-    def book_ticket(self):
-        # Must have selected train
-        if not hasattr(self, "selected_train") or self.selected_train is None:
-            messagebox.showwarning("No train selected", "Please select a train from the list first.")
+    def show_available_seats(self):
+        if not self.selected_schedule:
+            messagebox.showwarning("No schedule", "Select a train and schedule first.")
             return
-        name = self.ent_name.get().strip()
-        phone = self.ent_phone.get().strip()
+        train_id = self.selected_schedule['train_id']
+        travel_date = self.selected_schedule['travel_date']
+        total_seats = int(self.trains[self.trains['train_id'] == train_id]['total_seats'].values[0])
+        avail = available_seats_for(train_id, travel_date, total_seats)
+        if not avail:
+            self.available_seats_box.delete("1.0", tk.END)
+            self.available_seats_box.insert("1.0", "No seats available.")
+            return
+        # show first 40 available seats nicely
+        display = ", ".join(str(x) for x in avail[:80])
+        self.available_seats_box.delete("1.0", tk.END)
+        self.available_seats_box.insert("1.0", f"Available seats (first shown):\n{display}")
+
+    def book_now(self):
+        name = self.book_name.get().strip()
+        phone = self.book_phone.get().strip()
+        try:
+            seats_needed = int(self.spin_seats.get())
+        except Exception:
+            messagebox.showerror("Invalid seats", "Enter a valid number of seats.")
+            return
         if not name:
-            messagebox.showwarning("Missing name", "Please enter passenger name.")
+            messagebox.showwarning("Missing name", "Enter passenger name.")
             return
         if not phone or not phone.isdigit() or len(phone) < 7:
-            messagebox.showwarning("Invalid phone", "Please enter a valid phone number.")
+            messagebox.showwarning("Invalid phone", "Enter a valid phone number.")
             return
-        travel_date = self.ent_date.get().strip()
-        try:
-            datetime.strptime(travel_date, "%Y-%m-%d")
-        except Exception:
-            messagebox.showerror("Invalid date", "Please enter date in YYYY-MM-DD format.")
+        if not self.selected_schedule:
+            messagebox.showwarning("No schedule", "Select a train & schedule first.")
             return
-        seats = int(self.spin_seats.get())
-        travel_class = self.cmb_class.get()
-        pps = price_for(self.selected_train["train_no"], travel_class)
-        total = pps * seats
-
-        # Create booking record
-        record = {
-            "booking_id": generate_booking_id(),
-            "timestamp": datetime.now().isoformat(),
-            "train_no": self.selected_train["train_no"],
-            "train_name": self.selected_train["name"],
-            "from": self.selected_train["from"],
-            "to": self.selected_train["to"],
-            "date": travel_date,
-            "class": travel_class,
-            "seats": seats,
-            "passenger_name": name,
-            "phone": phone,
-            "price_per_seat": pps,
-            "total_price": total
-        }
-        append_booking(record)
-        messagebox.showinfo("Booked ✔", f"Booking successful!\nBooking ID: {record['booking_id']}\nTotal: ₹{total}")
-        # clear some fields
-        self.ent_name.delete(0, tk.END)
-        self.ent_phone.delete(0, tk.END)
-        # refresh bookings tab and stats
+        train_id = self.selected_schedule['train_id']
+        travel_date = self.selected_schedule['travel_date']
+        total_seats = int(self.trains[self.trains['train_id'] == train_id]['total_seats'].values[0])
+        avail = available_seats_for(train_id, travel_date, total_seats)
+        if len(avail) < seats_needed:
+            messagebox.showerror("Not enough seats", f"Only {len(avail)} seats available.")
+            return
+        # allocate lowest seat numbers
+        allocated = avail[:seats_needed]
+        # append bookings for each seat
+        for s in allocated:
+            rec = {
+                "booking_id": gen_booking_id(),
+                "passenger_name": name,
+                "train_id": train_id,
+                "travel_date": travel_date,
+                "seat_no": str(s),
+                "status": "Confirmed"
+            }
+            append_booking_csv(rec)
+        messagebox.showinfo("Booked", f"Booked seats: {', '.join(str(x) for x in allocated)}\nBooking saved to data/bookings.csv")
+        # refresh
         self.refresh_bookings_table()
-        self.draw_stats_chart()
+        self.show_available_seats()
+        self.draw_stats()
 
     # -----------------------
-    # Tab: Bookings table
+    # Schedules Tab
     # -----------------------
-    def _build_bookings_tab(self):
-        frame = self.tab_bookings
-        top = ttk.Frame(frame)
-        top.pack(fill="x", pady=8, padx=8)
+    def build_schedules_tab(self):
+        f = ttk.Frame(self.tab_schedules, padding=12)
+        f.pack(fill="both", expand=True)
+        top = ttk.Frame(f)
+        top.pack(fill="x")
 
+        ttk.Label(top, text="Upcoming Schedules", style="Header.TLabel").pack(anchor="w")
+        self.sched_tree = ttk.Treeview(f, columns=("schedule_id","train","route","dep","arr","date"), show="headings", height=12)
+        self.sched_tree.heading("schedule_id", text="Schedule ID")
+        self.sched_tree.heading("train", text="Train")
+        self.sched_tree.heading("route", text="Route")
+        self.sched_tree.heading("dep", text="Dep")
+        self.sched_tree.heading("arr", text="Arr")
+        self.sched_tree.heading("date", text="Date")
+        self.sched_tree.pack(fill="both", expand=True, pady=8)
+        self.sched_tree.bind("<Double-1>", self.on_schedule_double)
+
+    def refresh_schedules_tree(self):
+        for r in self.sched_tree.get_children():
+            self.sched_tree.delete(r)
+        df = self.schedules.fillna("")
+        for _, row in df.iterrows():
+            train_name = self.trains[self.trains['train_id'] == row['train_id']]['train_name'].values[0]
+            tr = self.trains[self.trains['train_id'] == row['train_id']].iloc[0]
+            src_name = self.stations[self.stations['station_id'] == tr['source_id']]['station_name'].values[0]
+            dst_name = self.stations[self.stations['station_id'] == tr['destination_id']]['station_name'].values[0]
+            self.sched_tree.insert("", tk.END, iid=row['schedule_id'], values=(row['schedule_id'], train_name, f"{src_name}→{dst_name}", row['departure_time'], row['arrival_time'], row['travel_date']))
+
+    def on_schedule_double(self, event):
+        sel = self.sched_tree.selection()
+        if not sel:
+            return
+        sid = sel[0]
+        row = self.schedules[self.schedules['schedule_id'] == sid].iloc[0]
+        # jump to Book Ticket tab and prefill
+        self.nb.select(self.tab_book)
+        # set from/to based on train
+        tr = self.trains[self.trains['train_id'] == row['train_id']].iloc[0]
+        src_name = self.stations[self.stations['station_id'] == tr['source_id']]['station_name'].values[0]
+        dst_name = self.stations[self.stations['station_id'] == tr['destination_id']]['station_name'].values[0]
+        self.ent_from.delete(0, tk.END); self.ent_from.insert(0, src_name)
+        self.ent_to.delete(0, tk.END); self.ent_to.insert(0, dst_name)
+        self.ent_date.delete(0, tk.END); self.ent_date.insert(0, row['travel_date'])
+        # run search and select the train
+        self.search_trains_for_booking()
+        # select tree item for this train
+        try:
+            self.search_tree.selection_set(tr['train_id'])
+            self.on_search_select(None)
+        except Exception:
+            pass
+
+    # -----------------------
+    # My Bookings Tab
+    # -----------------------
+    def build_bookings_tab(self):
+        f = ttk.Frame(self.tab_bookings, padding=12)
+        f.pack(fill="both", expand=True)
+        top = ttk.Frame(f)
+        top.pack(fill="x")
         ttk.Button(top, text="Refresh", command=self.refresh_bookings_table).pack(side="left")
-        ttk.Button(top, text="Export CSV", command=self.export_bookings).pack(side="left", padx=8)
-        ttk.Button(top, text="Delete selected", command=self.delete_selected_booking).pack(side="left")
+        ttk.Button(top, text="Export CSV (data/bookings.csv)", command=lambda: messagebox.showinfo("Path", f"Bookings file: {BOOKINGS_CSV}")).pack(side="left", padx=6)
+        ttk.Button(top, text="Delete Selected", command=self.delete_selected_booking).pack(side="left", padx=6)
 
-        # Treeview for bookings
-        columns = ("booking_id", "timestamp", "train", "route", "date", "class", "seats", "passenger", "phone", "total")
-        self.tree = ttk.Treeview(frame, columns=columns, show="headings", selectmode="browse")
-        heading_map = {
-            "booking_id": "Booking ID",
-            "timestamp": "Time",
-            "train": "Train",
-            "route": "Route",
-            "date": "Date",
-            "class": "Class",
-            "seats": "Seats",
-            "passenger": "Passenger",
-            "phone": "Phone",
-            "total": "Total (₹)"
-        }
-        for col in columns:
-            self.tree.heading(col, text=heading_map[col])
-            self.tree.column(col, width=100, anchor="center")
-        self.tree.column("timestamp", width=140)
-        self.tree.column("passenger", width=140)
-        self.tree.pack(fill="both", expand=True, padx=8, pady=8)
+        cols = ("booking_id","passenger","train","date","seat","status")
+        self.bookings_tree = ttk.Treeview(f, columns=cols, show="headings", height=18)
+        for c in cols:
+            self.bookings_tree.heading(c, text=c.replace("_"," ").title())
+        self.bookings_tree.pack(fill="both", expand=True, pady=8)
 
     def refresh_bookings_table(self):
-        df = read_bookings_df()
-        # clear tree
-        for r in self.tree.get_children():
-            self.tree.delete(r)
-        # insert rows
+        for r in self.bookings_tree.get_children():
+            self.bookings_tree.delete(r)
+        df = read_bookings_df().fillna("")
         if df.empty:
             return
-        # sort by time desc
+        # sort by booking_id (time encoded) descending
         try:
-            df_sorted = df.sort_values("timestamp", ascending=False)
+            df_sorted = df.sort_values("booking_id", ascending=False)
         except Exception:
             df_sorted = df
         for _, row in df_sorted.iterrows():
-            tid = row.get("booking_id", "")
-            time = str(row.get("timestamp", ""))
-            train = f"{row.get('train_no','')} {row.get('train_name','')}"
-            route = f"{row.get('from','')}→{row.get('to','')}"
-            date = row.get("date", "")
-            cls = row.get("class", "")
-            seats = int(row.get("seats", 0))
-            name = row.get("passenger_name", "")
-            phone = row.get("phone", "")
-            total = row.get("total_price", 0)
-            self.tree.insert("", tk.END, iid=tid, values=(tid, time, train, route, date, cls, seats, name, phone, total))
-
-    def export_bookings(self):
-        # Already stored in bookings.csv; just inform user
-        if os.path.exists(BOOKINGS_FILE):
-            messagebox.showinfo("Exported", f"Bookings already stored in {BOOKINGS_FILE} in current folder.")
-        else:
-            messagebox.showwarning("No file", "No bookings file found.")
+            train_name = self.trains[self.trains['train_id'] == row['train_id']]['train_name'].values[0] if row['train_id'] in self.trains['train_id'].values else row['train_id']
+            self.bookings_tree.insert("", tk.END, iid=row['booking_id'], values=(row['booking_id'], row['passenger_name'], train_name, row['travel_date'], row['seat_no'], row['status']))
 
     def delete_selected_booking(self):
-        sel = self.tree.selection()
+        sel = self.bookings_tree.selection()
         if not sel:
-            messagebox.showwarning("No selection", "Select a booking in the table first.")
+            messagebox.showwarning("Select", "Select a booking to delete.")
             return
         bid = sel[0]
-        confirm = messagebox.askyesno("Confirm delete", f"Delete booking {bid}? This action cannot be undone.")
-        if not confirm:
+        ok = messagebox.askyesno("Confirm", f"Delete booking {bid}?")
+        if not ok:
             return
-        # Read CSV, drop booking id, write back
         df = read_bookings_df()
-        if "booking_id" in df.columns:
-            df2 = df[df["booking_id"] != bid]
-            df2.to_csv(BOOKINGS_FILE, index=False)
-            messagebox.showinfo("Deleted", f"Booking {bid} removed.")
-            self.refresh_bookings_table()
-            self.draw_stats_chart()
-        else:
-            messagebox.showerror("Error", "Could not delete — unexpected CSV format.")
+        df2 = df[df['booking_id'] != bid]
+        df2.to_csv(BOOKINGS_CSV, index=False)
+        self.refresh_bookings_table()
+        self.draw_stats()
+        messagebox.showinfo("Deleted", f"Booking {bid} removed.")
 
     # -----------------------
-    # Tab: Stats (matplotlib)
+    # Stats Tab
     # -----------------------
-    def _build_stats_tab(self):
-        frame = self.tab_stats
-        self.stats_frame = ttk.Frame(frame)
-        self.stats_frame.pack(fill="both", expand=True, padx=8, pady=8)
-
-        controls = ttk.Frame(self.stats_frame)
-        controls.pack(fill="x", pady=(6,12))
-        ttk.Label(controls, text="Show bookings grouped by:").pack(side="left")
-        self.cmb_stats = ttk.Combobox(controls, values=["train_name", "route", "class", "date"], state="readonly", width=18)
-        self.cmb_stats.set("train_name")
+    def build_stats_tab(self):
+        f = ttk.Frame(self.tab_stats, padding=12)
+        f.pack(fill="both", expand=True)
+        top = ttk.Frame(f)
+        top.pack(fill="x")
+        ttk.Label(top, text="Booking Statistics", style="Header.TLabel").pack(side="left")
+        self.cmb_stats = ttk.Combobox(top, values=["train_id","travel_date","status"], state="readonly", width=18)
+        self.cmb_stats.set("train_id")
         self.cmb_stats.pack(side="left", padx=6)
-        ttk.Button(controls, text="Draw", command=self.draw_stats_chart).pack(side="left", padx=6)
+        ttk.Button(top, text="Draw", command=self.draw_stats).pack(side="left")
 
-        # area for matplotlib canvas
-        self.chart_area = ttk.Frame(self.stats_frame)
-        self.chart_area.pack(fill="both", expand=True)
+        self.chart_area = ttk.Frame(f)
+        self.chart_area.pack(fill="both", expand=True, pady=8)
 
-    def draw_stats_chart(self):
-        # clear chart_area
+    def draw_stats(self):
         for w in self.chart_area.winfo_children():
             w.destroy()
         df = read_bookings_df()
         if df.empty:
-            lbl = ttk.Label(self.chart_area, text="No bookings yet — book a ticket to see stats!", foreground="#666")
-            lbl.pack(pady=20)
+            ttk.Label(self.chart_area, text="No bookings yet", foreground="#666").pack(pady=20)
             return
-        group_by = self.cmb_stats.get() or "train_name"
-        df = df.copy()
-        # create route column if needed
-        if "route" not in df.columns:
-            df["route"] = df.get("from", "") + "→" + df.get("to", "")
-        # try group
+        group_by = self.cmb_stats.get() or "train_id"
         try:
             series = df.groupby(group_by)["booking_id"].count().sort_values(ascending=False)
         except Exception:
-            # fallback
-            series = df["booking_id"].value_counts().head(10)
-        # limit to top 8 for clarity
+            series = df['booking_id'].value_counts().head(8)
         series = series.head(8)
         labels = list(series.index.astype(str))
         values = list(series.values)
@@ -410,21 +644,20 @@ class RailTicketApp(tk.Tk):
         ax = fig.add_subplot(111)
         ax.bar(labels, values)
         ax.set_title(f"Bookings by {group_by}")
-        ax.set_ylabel("Number of bookings")
+        ax.set_ylabel("Count")
         ax.set_xlabel(group_by)
         ax.tick_params(axis='x', rotation=30)
 
         canvas = FigureCanvasTkAgg(fig, master=self.chart_area)
         canvas.draw()
-        widget = canvas.get_tk_widget()
-        widget.pack(fill="both", expand=True)
+        canvas.get_tk_widget().pack(fill="both", expand=True)
 
-# ---------------------------
-# Run app
-# ---------------------------
+# -----------------------
+# Run
+# -----------------------
 def main():
-    ensure_bookings_file()
-    app = RailTicketApp()
+    ensure_data_files()
+    app = RailApp()
     app.mainloop()
 
 if __name__ == "__main__":
